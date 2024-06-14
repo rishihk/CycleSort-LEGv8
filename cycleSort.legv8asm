@@ -1,0 +1,597 @@
+main:
+    // Stack allocation to save array and size sparameters
+    SUBI SP, SP, #16
+    STUR X19, [SP, #0]
+    STUR X20, [SP, #8]
+
+    ADD X19, XZR, XZR // base address of array a
+    ADDI X20, XZR, #16 // n = 16. We can test if its sorting our 16 elements
+
+    // First call fill
+    ADD X0, XZR, X19 // X0 has arr base address
+    ADD X1, XZR, X20 // X1 has the size
+
+    BL fill // call fill
+
+    // cycle sort the array now
+    ADD X0, XZR, X19 // X0 has arr base address
+    ADD X1, XZR, X20 // X1 has arr size
+
+    BL cycle_sort // call cycle sort. Array should be 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, a, b, c, d, e, f. WORKS
+
+    // Binary search call 1
+    ADD X0, XZR, X19 // X0 has base address
+    ADD X1, XZR, XZR // X1 has start = 0
+    SUBI X2, X20, #1 // X2 has n - 1
+    ADDI X3, XZR, #0 // target is 0
+
+    BL binary_search
+
+    PRNL 
+    PRNT X0 // should be 0. Works
+    PRNL 
+
+    // Binary Search Call 2
+    ADD X0, XZR, X19
+    ADD X1, XZR, XZR
+    SUBI X2, X20, #1
+    ADD X3, XZR, X2 // target is n - 1
+
+    BL binary_search
+
+    PRNL 
+    PRNT X0 // should be 15. Works
+    PRNL 
+
+    // Binary search call 3
+    ADD X0, XZR, X19
+    ADD X1, XZR, XZR
+    SUBI X2, X20, #1
+    LSR X4, X20, #1
+    ADD X3, XZR, X4 // target = n / 2
+
+    BL binary_search
+
+    PRNL
+    PRNT X0 // should be 8. Works
+    PRNL
+
+    // Binary search call 4
+    ADD X0, XZR, X19
+    ADD X1, XZR, XZR
+    SUBI X2, X20, #1
+    ADD X3, XZR, X20 // target = n
+
+    BL binary_search
+
+    PRNL
+    PRNT X0 // should be -1. Works
+    PRNL
+
+    // Restore saved registers
+    LDUR X20, [SP, #8]
+    LDUR X19, [SP, #0]
+    ADDI SP, SP, #16
+
+    B end // goto end
+
+// this function is given two integer pointers a and b as the parameters and we have to swap them.
+// lets say that X0  is int *a, and X1 is int *b.
+swap:
+
+    // malloc stack space
+    SUBI SP , SP , #16 // allocate space in the stack for two registers
+    STUR X9 , [SP , #8] // allocating space for a temp register
+    STUR X10 , [SP , #0] // allocating space for second register used to swap
+
+    //main swap logic
+    LDUR X9 , [X0 , #0] // X9 = *a meaning int temp = *a
+    LDUR X10 , [X1 , #0] // X10 = *b
+    STUR X10 , [X0 , #0] // *a = *b
+    STUR X9 , [X1 , #0]  // *b = temp
+
+    // free stack space
+    LDUR X10 , [SP , #0] // pop b's register
+    LDUR X9 , [SP , #8] // pop temps register
+    ADDI SP , SP , #16 // re-allocate the space back
+
+    BR LR // return
+
+
+// returns the sorted order index of value in the array
+// let X0 be the base address of the array
+// let X1 be the size of the array
+// let X2 be the start 
+// let X3 be the value 
+// the function returns the value of index.
+find_index:
+
+    // first thing we see in the function is 2 local variables int i and int index
+    // i is set to start + 1, and index is set to start
+    // lets begin with that
+    // X9 = i, X10 = index
+    SUBI SP, SP, #32
+    STUR LR, [SP, #0]
+    STUR X9, [SP, #8]
+    STUR X10, [SP, #16]
+    STUR X11, [SP, #24]
+
+    ADDI X9, X2, #1 // we have X9 = start + 1 => i = start + 1
+    ADD X10, X2, XZR // we have X10  = start + 0 => index = start
+
+    // now lets start the loop
+    find_index_loop:
+
+        SUBS XZR, X9, X1 // first lets compare i and n
+        B.GE find_index_end // if i >= n, we goto exit
+
+        LSL X11, X9, #3 // X11 = i * 8
+        ADD X11, X11, X0 // X11 = arr + i * 8 = address of arr[i]
+        LDUR X11, [X11, #0] // X11 = value of arr[i]
+
+        //if code reaches here it means the loop is still going on
+        SUBS XZR, X11, X3 // so we compare a[i] and value
+        B.GE increment_i // if a[i] >= value, we only increment i and not the index, so goto increment i
+
+        // if code reaches here it means a[i] < value
+        // so lets increment the index
+        ADDI X10, X10, #1 // index ++;
+        B increment_i // then increment i
+
+        increment_i:
+
+            ADDI X9, X9, #1 // i++
+            B find_index_loop
+
+    find_index_end:
+
+        ADD X4, X10, XZR 
+
+        LDUR X11, [SP, #24] // free
+        LDUR X10, [SP, #16]
+        LDUR X9, [SP, #8]
+        LDUR LR, [SP, #0]
+        ADDI SP, SP, #32
+
+        BR LR // return
+
+
+// this function returns the index of the first element in arr after start, not equal to value
+// let say X0 is the base address of the array
+// lets say X1 is the start 
+// lets say X2 is the value
+// this function returns index
+skip_duplicates:
+
+    SUBI SP, SP, #24
+    STUR LR, [SP, #0]
+    STUR X9, [SP, #8]
+    STUR X10, [SP, #16]
+
+    // first thing in this function is initializing index
+    // index = start
+    ADD X9, X1, XZR // X9 = start + 0 = start = index
+    
+    // now lets start the loop
+    skip_duplicates_loop:
+
+        // lets load a[index] for loop condition
+        LSL X10, X9, #3 // X10 = i*8
+        ADD X10, X10, X0 // X10 = arr + i * 8 = address of arr[i]
+        LDUR X10, [X10, #0] // X10 = value of arr[i]
+
+        SUBS XZR, X2, X10 // compare arr[index] and value
+        B.NE skip_duplicates_end // if they are not equal, goto exit
+
+        // if we come here it means arr[index] and value are equal
+        ADDI X9, X9, #1 // so we increment index
+        B skip_duplicates_loop // go to loop
+
+    skip_duplicates_end:
+
+        ADD X3, X9, XZR 
+
+        LDUR X10, [SP, #16] // free
+        LDUR X9, [SP, #8]
+        LDUR LR, [SP, #0]
+        ADDI SP, SP, #24
+
+        BR LR // return
+
+// fills the array with decreasing values n - 1 to zero
+// lets say that X0 is the base address of the array
+// lets say that X1 is the size of the array
+fill:
+
+    SUBI SP, SP, #40
+    STUR X9, [SP, #0]
+    STUR X10, [SP, #8]
+    STUR X11, [SP, #16]
+    STUR X12, [SP, #24]
+    STUR X13, [SP, #32]
+
+    //first thing fill does is initialize i to 0
+    ADD X9, XZR, XZR // X9 = i = 0
+
+    // now lets start the loop
+    loop:
+        // first we check the loop condition before entering the loop
+        // so we compare i and n
+        SUBS XZR, X9, X1
+        B.GE exit // if i >= n, we goto exit
+
+        // lets get a[i]
+        LSL X10, X9, #3 // X10 = i * 8
+        ADD X11, X10, X0 // X11 = arr + i * 8 = address of arr[i]
+
+        // we want a register to have the value of n - 1 - i now
+        SUB X12, X1, X9 // X12 = n - i
+        SUBI X13, X12, #1 // X13 = n - i - 1
+
+        STUR X13, [X11, #0] // a[i] = n - 1 - i
+
+        ADDI X9, X9, #1 // i++
+        B loop // continue to loop
+
+    exit: 
+
+        LDUR X13, [SP, #32]
+        LDUR X12, [SP, #24]
+        LDUR X11, [SP, #16]
+        LDUR X10, [SP, #8]
+        LDUR X9, [SP, #0]
+
+        BR LR // return
+    
+    
+// complete cycle finds the index and does the swap for each element in the cycle from start
+// let X0 be the base address of arr
+// let X1 be the size of the array
+// let X2 be the start 
+// let X3 be the index
+// let X4 be the value
+// this function is void, so no return register needed
+complete_cycle:
+
+    // this is not a leaf procedure so we have to malloc
+    SUBI SP, SP, #32
+    STUR X19, [SP, #0]
+    STUR X20, [SP, #8]
+    STUR X21, [SP, #16]
+    STUR LR, [SP, #24]
+
+    cc_loop:
+
+        //we compare index and start
+        SUBS XZR, X3, X2
+        B.EQ cc_exit // if they are equal we go to exit
+
+        // if the code reaches here, it means that index != start, so we perform the loop body
+        // first thing the function does is call find_index and assign its return value to index
+        // find_index(a, n, start, value)
+        // X0, X1, X2 are already set to a, n, and start. But value is X4 in this procedure and in find index it takes it as X3. So we make that switch.
+        // we are going to be putting X4 which is value into X3, so before that lets save these values for current procedure.
+
+        ADD X19, X3, XZR // saving X3 complete cycle into X19
+        ADD X20, X4, XZR // saving X4 complete cycle into X20
+        ADD X3, X4, XZR // now make the switch. So now, X3 has X4 which is value.
+
+        // now we are ready to make the call to find_index
+        BL find_index
+
+        // find index returns the index value to X4. Lets store the returned value for index into X9.
+        // lets restore back the procedures values after that
+        ADD X9, X4, XZR // now X9 has the returned index value
+        ADD X3, X19, XZR // now X3 is back to being complete cycles index parameter
+        ADD X4, X20, XZR // now X4 is back to being complete cycles value parameter
+
+        // now the next step in the loop body is a similar call to skip duplicates
+        // we follow the same method as above
+        // skip_duplicates(a, index, value)
+        // we already have a as X0, but start is at X2 and index is at X9 and value is at X4
+        // we need to get index to X1 and value to X2 for skip_duplicates to function correctly
+
+        ADD X19, X1, XZR // X19 has complete cycles size parameter
+        ADD X20, X2, XZR // X20 has complete cycles start parameter 
+        ADD X21, X3, XZR // X21 has complete cycles index
+
+        // now lets make the move of start to X1 and value to X2
+        ADD X1, X9, XZR // now X1 = index
+        ADD X2, X4, XZR // now X2 = value
+
+        // now we are ready to make the call
+        BL skip_duplicates
+
+        // skip duplicates returns the index value to X3. We need to claim it and then copy back complete cycles registers
+        ADD X9, X3, XZR // X9 = index
+        ADD X1, X19, XZR // X1 is back to being size of cc
+        ADD X2, X20, XZR // X2 is back to being start of cc
+        ADD X3, X21, XZR // X3 is back to being index of cc
+
+        // now we swap value and a[index]. We can perform the swap in place. index is at X9, and value is at X4
+        // first lets load a[index]
+        LSL X10, X9, #3 // X10 = index * 8
+        ADD X11, X10, X0 // X11 = index * 8 + arr = address of arr[index]
+
+        // int temp = arr[index]
+        LDUR X12, [X11, #0] // X12 = arr[index]
+        STUR X4, [X11, #0] // arr[index] = value
+        ADD X4, X12, XZR // value = arr[index]
+
+        // updated index value is in X9 now and thats the one being compared in condition.
+        SUBS XZR, X9, X2 // compare updated index value and start
+        B.EQ cc_exit // if they are equal we exit
+        
+        // if we reach here, it means index != start so we continue the loop
+        B cc_loop
+
+    cc_exit: 
+
+        // free
+        LDUR LR, [SP, #24]
+        LDUR X21, [SP, #16]
+        LDUR X20, [SP, #8]
+        LDUR X19, [SP, #0]
+        ADDI SP, SP, #32
+
+        BR LR // return
+
+
+// searches the array for a target value and returns its index if found. If not found it returns -1
+// let X0 be the base address of arr
+// let X1 be the start
+// let X2 be the end
+// let X3 be the value
+// Returns index of target to X0
+binary_search:
+
+    // storing the required registers
+    SUBI SP, SP, #40
+    STUR LR, [SP, #0]
+    STUR X9, [SP, #8]
+    STUR X10, [SP, #16]
+    STUR X11, [SP, #24]
+    STUR X12, [SP, #32]
+
+    // we can branch into left half search, and right half search to maintain control flow based on comparisons.
+    // we can branch into target found or target not found based on search results
+
+    // first if check (base case)
+    SUBS XZR, X2, X1
+    B.LT target_not_found // if end < start, we goto target not found
+
+    // we setup local variable index (midpoint)
+    ADD X9, X2, X1 // X9 = index = end + start
+    LSR X9, X9, #1 // we use the right shift operator and shift by 1 to divide by 2. So we set X9 = index = (start + end) / 2
+
+    // the next if check checks if a[index] == value. So first lets load a[index]
+    LSL X10, X9, #3 // X10 = index * 8
+    ADD X11, X10, X0 // X11 = arr + index * 8 = address of arr[index]
+    LDUR X12, [X11, #0] // X12 = value arr[index]
+
+    SUBS XZR, X12, X3 // compare arr[index] and target
+
+    // now based on the three comparisons, we go to specific branches
+
+    B.EQ target_found // if they are equal, goto target found
+    B.GT left_half_search // if arr[index] > value, we perform a left recursive search
+    B.LT right_half_search // if arr[index] < value, we perform a right recursive search
+
+    left_half_search:
+        // we search only the left half by setting the end to index - 1, then we do this recursively, so we call binary search again.
+        SUBI X2, X9, #1 // end = index - 1
+        BL binary_search // call binary search
+        B free_stack_and_return
+        
+    right_half_search:
+        // we search only the right half by setting the start to index + 1, then we do this recursively, so we call binary search again.
+        ADDI X1, X9, #1 // start = index + 1
+        BL binary_search // call binary search
+        B free_stack_and_return
+
+    target_found:
+        // the index of found element is stored in X9. The function already uses X0 - X3 for its parameters, so lets store it to X4.
+        ADD X0, X9, XZR // X4 = index of target
+        B free_stack_and_return
+
+    target_not_found:
+        // if the target doesnt exist in the array, we return -1.
+        ADDI X0, XZR, #-1 // X4 = -1
+        B free_stack_and_return
+
+    free_stack_and_return:
+
+        LDUR X12, [SP, #32] // free the stack
+        LDUR X11, [SP, #24]
+        LDUR X10, [SP, #16]
+        LDUR X9, [SP, #8]
+        LDUR LR, [SP, #0]
+        ADDI SP, SP, #40
+
+        BR LR // return
+
+// this procedure sorts the array a of n elements using the cycle sort algorithm
+// let X0 be the base address of the array
+// let X1 be the size of the array
+cycle_sort:
+
+    // allocating space on the stack for callee saved registers
+    SUBI SP, SP, #48
+    STUR X19, [SP, #0]
+    STUR X20, [SP, #8]
+    STUR X21, [SP, #16]
+    STUR X22, [SP, #24]
+    STUR X23, [SP, #32]
+    STUR LR, [SP, #40]
+
+    // first local variable in the procedure is cstart, and we initialize it to 0.
+    ADD X9, XZR, XZR 
+
+    // lets begin the loop body
+    B cs_loop
+
+    increment_cstart:
+        ADDI X9, X9, #1 // cstart++
+        SUBI X15, X1, #1 // X15 = n - 1
+        SUBS XZR, X9, X15 // compare cstart and n - 1
+        B.GE end_sort // if cstart >= n - 1 we end the sort
+
+    cs_loop:
+    
+        // first thing to do is load a[cstart] into val
+        //ADD X10, XZR, X9  
+        LSL X10, X9, #3 // X10 = cstart * 8
+        ADD X10, X10, X0 // X10 = cstart * 8 + arr = address of a[cstart]
+        LDUR X11, [X10, #0] // X11 = val
+
+        // next thing we do is make the call to find_index. We follow a similar process as we did for complete_cycle
+        // we already have a in X0 and n in X1, we want cstart into X2 and val into X3.
+        // before the move, we first save current procedures register values and copy them back after the call.
+
+        ADD X19, XZR, X2 // X19 = current procedures X2
+        ADD X20, XZR, X3 // X20 = current procedures X3
+        ADD X21, XZR, X4 // X21 = current procedures X4
+        ADD X22, XZR, X9 // X22 = current procedures X9 which we copy into X2
+        ADD X23, XZR, X11 // x23 = current procedures X11 which we copy into X3
+
+        ADD X2, XZR, X9 // load param X2 with cstart
+        ADD X3, XZR, X11 // load param X3 with val
+
+        BL find_index // find_index(a, n, cstart, value)
+
+        ADD X12, XZR, X4 // idx = X12
+
+        // restore current procedures values back into respective registers
+        ADD X2, XZR, X19
+        ADD X3, XZR, X20
+        ADD X4, XZR, X21
+        ADD X9, XZR, X22
+        ADD X10, XZR, X23
+
+        SUBS XZR, X12, X9 // compare idx and cstart
+        B.EQ increment_cstart // if they are equal, we go back to the top and start the loop again, so we goto increment_cstart
+
+        // now in the same way we get registers ready for the call to skip duplicates
+        ADD X19, XZR, X1
+        ADD X20, XZR, X2
+        ADD X21, XZR, X3
+        ADD X23, XZR, X11
+
+        ADD X1, XZR, X12 // load idx into X1
+        ADD X2, XZR, X11 // load val into X2
+
+        BL skip_duplicates // skip_duplicates(a, idx, val)
+
+        ADD X12, XZR, X3 // idx = X12
+
+        // restore current procedures value back to respective registers
+        ADD X1, XZR, X19
+        ADD X2, XZR, X20
+        ADD X3, XZR, X21
+        ADD X11, XZR, X23
+
+        // now we want to swap val and a[idx], val is at X11 and idx is at X12, lets first load a[idx] into X13
+        LSL X13, X12, #3 // X13 = idx * 8
+        ADD X13, X13, X0 // X13 = arr + idx * 8 = address of arr[idx]
+        LDUR X14, [X13, #0] // int temp = a[idx] (X14 = a[idx]) value of a[idx]
+
+        STUR X11, [X13, #0] // a[idx] = value
+        ADD X11, X14, XZR // value = a[idx]
+
+        // now we make the call to complete cycle. Similarly we get the registers ready
+        ADD X19, XZR, X2
+        ADD X20, XZR, X3
+        ADD X21, XZR, X4
+        ADD X22, XZR, X9
+
+        ADD X2, XZR, X9 // load cstart into X2
+        ADD X3, XZR, X12 // load idx into X3
+        ADD X4, XZR, X11 // load val into X4
+
+        BL complete_cycle // complete_cycle(a, n, cstart, idx, val)
+
+        // restore current procedures values
+        ADD X2, XZR, X19
+        ADD X3, XZR, X20
+        ADD X4, XZR, X21
+        ADD X9, XZR, X22
+
+        SUBI X15, X1, #1 // X15 = n - 1
+        SUBS XZR, X9, X15 // compare cstart and n - 1
+        B.LT increment_cstart // if cstart < n - 1, then we continue the loop from the top, so we goto increment_cstart
+
+    end_sort:
+        // popping everything off
+        LDUR LR, [SP, #40]
+        LDUR X23, [SP, #32]
+        LDUR X22, [SP, #24]
+        LDUR X21, [SP, #16]
+        LDUR X20, [SP, #8]
+        LDUR X19, [SP, #0]
+        ADDI SP, SP, #48
+        
+        BR LR // return
+
+end:
+    PRNL
+    HALT
+
+// testing:
+//     // freeing up stack space for registers used to call functions
+//     SUBI SP, SP, #32
+//     STUR X19, [SP, #0]
+//     STUR X20, [SP, #8]
+//     STUR X21, [SP, #16]
+//     STUR X22, [SP, #24]
+
+//     ADD X19, XZR, XZR // this is base address of a
+//     ADDI X20, XZR, #16 // this is size of array n = 16
+
+//     ADD X0, X19, XZR // loaded base address to X0
+//     ADD X1, X20, XZR // loaded size of array to X1
+
+//     // FILL CALL
+//     BL fill
+//     // FILL CALL
+
+//     ADDI X21, XZR, #0 // this is start value used for find_index
+//     ADDI X22, XZR, #7 // this is int value used for find_index
+
+//     ADD X2, X21, XZR // loading them into required parameters
+//     ADD X3, X22, XZR // loading them into required parameters
+
+//     // FIND INDEX CALL
+//     BL find_index // X4 should have 7
+//     // FIND INDEX CALL
+
+//     ADD X1, XZR, XZR
+//     ADD X2, XZR, XZR
+
+//     ADDI X1, XZR, #2
+//     ADDI X2, XZR, #8
+
+//     // SKIP DUPLICATES CALL
+//     BL skip_duplicates // X3 should have 2
+//     // SKIP DUPLICATES CALL
+
+//     // lets call complete cycle now
+//     // X0 has address already
+//     // lets put size to X1
+//     ADD X1, XZR, XZR
+//     ADD X1, X20, XZR // now X1 has size of array = 16
+//     //X2 should have start index
+//     ADD X2, XZR, XZR
+//     ADDI X2, X2, #3 // let start be 0
+//     //X3 should have initial index
+//     ADD X3, XZR, XZR
+//     ADDI X3, X3, #2
+//     // X4 should have value to be switched
+//     ADD X4, XZR, XZR
+//     ADDI X4, X4, #8
+
+//     // COMPLETE CYCLE CALL
+//     BL complete_cycle // X9 should be 3. Array should be 15 14 13 0 1 2 3 4 7 6 5 8 8 9 10 11
+//     // COMPLETE CYCLE CALL
+//     PRNL
+//     DUMP
+//     HALT
